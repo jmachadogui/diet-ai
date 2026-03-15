@@ -1,0 +1,35 @@
+{
+  "name": "@diet-ai/api",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node --watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "bullmq": "^5.8.4",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^5.1.1",
+    "@diet-ai/shared": "workspace:*",
+    "@diet-ai/db": "workspace:*",
+    "@diet-ai/llm": "workspace:*",
+    "@diet-ai/nutrition": "workspace:*",
+    "@diet-ai/messaging": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/bcrypt": "^5.0.2",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.9",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "ts-node": "^10.9.2"
+  }
+}
