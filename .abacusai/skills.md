@@ -26,6 +26,15 @@
 - Respect the task dependency order in `docs/tasks.md`; do not implement a task whose dependencies are not yet complete.
 - For bugs: write a failing test first, fix the bug, then verify the test passes.
 
+## Git Workflow Skills
+
+- Never commit directly to `master` or `main`. Always create a new branch for every feature, fix, or task before making any changes.
+- Branch names must be short and descriptive, using kebab-case (e.g., `feat/meal-log-parser`, `fix/nutrition-cache-key`).
+- Commits must be atomic: each commit should represent a single logical change. Do not bundle unrelated changes into one commit.
+- Write clear, imperative commit messages that describe what the commit does (e.g., `add NutritionProvider interface`, `fix OAuth token refresh logic`).
+- Once a task is complete and all changes are committed on the feature branch, open a pull request against `master`/`main` with a description that includes: what was done, why, and any relevant context or decisions made.
+- Never merge the pull request yourself — leave it open for review unless explicitly instructed to merge.
+
 ## Integration Skills (External APIs)
 
 - **AbacusAI RouteLLM:** all LLM calls go through `packages/llm`. Use the OpenAI-compatible SDK. Default model is `claude-sonnet-4-5`; override via env var. Never call the API directly from service files.
