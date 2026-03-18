@@ -1,0 +1,174 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  passwordHash     String
+  dailyCalorieGoal Int?
+  weightKg         Float?
+  heightCm         Float?
+  age              Int?
+  sex              String?
+  activityLevel    String?
+  createdAt        DateTime @default(now())
+
+  identities      UserIdentity[]
+  magicLinkTokens MagicLinkToken[]
+  logs            Log[]
+  meals           Meal[]
+  weightHistory   UserWeightHistory[]
+  editHistory     EditHistory[]
+
+  @@map("users")
+}
+
+model UserIdentity {
+  id             String    @id @default(uuid())
+  userId         String
+  platform       String
+  platformUserId String
+  linkedAt       DateTime  @default(now())
+  lastSeenAt     DateTime?
+  isPrimary      Boolean   @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, platformUserId])
+  @@index([userId])
+  @@map("user_identities")
+}
+
+model MagicLinkToken {
+  id          String    @id @default(uuid())
+  userId      String
+  platform    String
+  token       String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  redirectUrl String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, platform])
+  @@map("magic_link_tokens")
+}
+
+model Log {
+  id                    String    @id @default(uuid())
+  userId                String
+  platform              String
+  platformMessageId     String?
+  messageTimestamp      DateTime?
+  rawText               String
+  llmOutput             Json?
+  intent                String?
+  processingStatus      String
+  clarificationPrompt   String?
+  clarificationResponse String?
+  latencyMs             Int?
+  errorCode             String?
+  errorMessage          String?
+  createdAt             DateTime  @default(now())
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meals       Meal[]
+  editHistory EditHistory[]
+
+  @@index([userId, createdAt])
+  @@map("logs")
+}
+
+model Meal {
+  id            String   @id @default(uuid())
+  userId        String
+  sourceLogId   String?
+  occasion      String?
+  consumedAt    DateTime
+  createdAt     DateTime @default(now())
+  totalCalories Int?
+  totalProteinG Float?
+  totalCarbsG   Float?
+  totalFatG     Float?
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceLog   Log?          @relation(fields: [sourceLogId], references: [id])
+  items       MealItem[]
+  editHistory EditHistory[]
+
+  @@index([userId, consumedAt])
+  @@map("meals")
+}
+
+model MealItem {
+  id                   String  @id @default(uuid())
+  mealId               String
+  foodName             String
+  quantity             Float
+  unit                 String
+  weightG              Float?
+  calories             Int?
+  proteinG             Float?
+  carbsG               Float?
+  fatG                 Float?
+  nutritionApi         String?
+  apiRefId             String?
+  apiResponseSnapshot  Json?
+  resolutionConfidence String?
+  notes                String?
+
+  meal Meal @relation(fields: [mealId], references: [id], onDelete: Cascade)
+
+  @@map("meal_items")
+}
+
+model ApiCache {
+  id                  String   @id @default(uuid())
+  vendor              String
+  queryString         String
+  normalizedQueryHash String   @unique
+  nutritionData       Json
+  fetchedAt           DateTime @default(now())
+  expiresAt           DateTime
+
+  @@index([expiresAt])
+  @@map("api_cache")
+}
+
+model UserWeightHistory {
+  id         String   @id @default(uuid())
+  userId     String
+  weightKg   Float
+  recordedAt DateTime @default(now())
+  source     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, recordedAt])
+  @@map("user_weight_history")
+}
+
+model EditHistory {
+  id          String   @id @default(uuid())
+  userId      String
+  mealId      String
+  sourceLogId String?
+  editType    String
+  oldValue    Json?
+  newValue    Json?
+  changedAt   DateTime @default(now())
+
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meal      Meal  @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  sourceLog Log?  @relation(fields: [sourceLogId], references: [id])
+
+  @@index([userId, changedAt])
+  @@map("edit_history")
+}
