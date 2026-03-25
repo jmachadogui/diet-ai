@@ -7,10 +7,10 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "jest",
-    "migrate:dev": "prisma migrate dev",
-    "migrate:deploy": "prisma migrate deploy",
-    "generate": "prisma generate",
-    "studio": "prisma studio"
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^5.14.0"

@@ -1,7 +1,5 @@
 # Project Journal
 
----
-
 ## 2026-03-18 — T-02: Prisma Schema & Database Setup
 
 ### Created feature branch
