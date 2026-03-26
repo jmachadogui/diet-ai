@@ -199,6 +199,9 @@ importers:
 
   packages/nutrition:
     dependencies:
+      '@diet-ai/db':
+        specifier: workspace:*
+        version: link:../db
       '@diet-ai/shared':
         specifier: workspace:*
         version: link:../shared

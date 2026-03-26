@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "axios": "^1.7.2",
-    "@diet-ai/shared": "workspace:*"
+    "@diet-ai/shared": "workspace:*",
+    "@diet-ai/db": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.4.5",

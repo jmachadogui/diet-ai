@@ -11,6 +11,7 @@ export * from './repositories/userWeightHistory.repository'
 export * from './repositories/editHistory.repository'
 
 export type {
+  PrismaClient,
   User,
   UserIdentity,
   MagicLinkToken,
