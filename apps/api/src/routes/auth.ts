@@ -1,7 +1,9 @@
 import { Router, type Router as ExpressRouter } from "express";
 import { z } from "zod";
 import { register, login } from "../services/authService";
-import { BadRequestError, NotImplementedError } from "../middleware/errorHandler";
+import { generateMagicLink, verifyMagicLink } from "../services/magicLinkService";
+import { BadRequestError } from "../middleware/errorHandler";
+import { authenticateJWT } from "../middleware/authenticate";
 
 const router: ExpressRouter = Router();
 
@@ -47,7 +49,39 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
-router.post("/magic-link/generate", (_req, _res, next) => next(new NotImplementedError()));
-router.get("/magic-link/verify", (_req, _res, next) => next(new NotImplementedError()));
+const generateSchema = z.object({
+  platform: z.enum(["telegram"]),
+});
+
+const verifyQuerySchema = z.object({
+  token: z.string().min(1),
+  platformUserId: z.string().min(1),
+});
+
+router.post("/magic-link/generate", authenticateJWT, async (req, res, next) => {
+  try {
+    const parsed = generateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return next(new BadRequestError(parsed.error.errors[0]?.message ?? "Invalid input"));
+    }
+    const result = await generateMagicLink(req.user!.sub, parsed.data.platform);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/magic-link/verify", async (req, res, next) => {
+  try {
+    const parsed = verifyQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return next(new BadRequestError(parsed.error.errors[0]?.message ?? "Invalid input"));
+    }
+    await verifyMagicLink(parsed.data.token, parsed.data.platformUserId);
+    res.status(200).json({ message: "Account linked successfully" });
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

@@ -33,10 +33,7 @@ describe("Route stubs return 501", () => {
   const validToken = jwt.sign({ sub: "user-1", email: "a@b.com" }, "test-secret");
   const authHeader = `Bearer ${validToken}`;
 
-  const publicStubs: Array<[string, string]> = [
-    ["post", "/api/v1/auth/magic-link/generate"],
-    ["get", "/api/v1/auth/magic-link/verify"],
-  ];
+  const publicStubs: Array<[string, string]> = [];
 
   const protectedStubs: Array<[string, string]> = [
     ["get", "/api/v1/meals"],
