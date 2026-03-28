@@ -184,9 +184,15 @@ importers:
         specifier: ^4.16.3
         version: 4.16.3
     devDependencies:
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
       '@types/jest':
         specifier: ^29.5.12
         version: 29.5.14
+      express:
+        specifier: ^4.19.2
+        version: 4.22.1
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@20.19.37)(ts-node@10.9.2(@types/node@20.19.37)(typescript@5.9.3))
