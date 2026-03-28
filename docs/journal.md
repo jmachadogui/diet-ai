@@ -179,3 +179,48 @@ Created one file per entity under `packages/db/src/repositories/`:
 - [x] Provider factory returns `AbacusAIProvider` when `LLM_PROVIDER=abacusai`.
 - [x] `pnpm --filter @diet-ai/llm build` passes with no TypeScript errors.
 - [x] `pnpm --filter @diet-ai/llm test` passes with all 13 tests green.
+
+---
+
+## 2026-03-28 — T-07: `apps/api` — Express Server Bootstrap
+
+**Branch:** `feat/t-07-express-server-bootstrap`
+
+**Steps taken:**
+
+- Read `docs/plans/t-07-plan.md`, `docs/tasks.md §T-07`, and confirmed T-02 and T-03 are complete.
+- Explored existing state of `apps/api/src/index.ts` (was a stub `export {}`), `apps/api/package.json`, and all provider factory signatures.
+- Created feature branch `feat/t-07-express-server-bootstrap` off `master`.
+- Created `apps/api/src/middleware/errorHandler.ts` — `AppError` base class, `NotImplementedError` (501), `UnauthorizedError` (401), and `errorHandler` four-argument middleware returning structured `{ error, message }` JSON. Stack traces written only to `stderr`, never to the response body.
+- Created `apps/api/src/middleware/authenticate.ts` — `authenticateJWT` middleware reading `Authorization: Bearer <token>`, verifying with `jsonwebtoken`, attaching decoded payload to `req.user`. Augments `Express.Request` globally so `req.user` is typed across all route files.
+- Created `apps/api/src/middleware/requestLogger.ts` — minimal logger writing `METHOD PATH STATUS DURATIONms` to stdout on response finish.
+- Created `apps/api/src/routes/auth.ts` — public stubs for `POST /register`, `POST /login`, `POST /magic-link/generate`, `GET /magic-link/verify`.
+- Created `apps/api/src/routes/users.ts` — protected stubs for `GET /me`, `PATCH /me`; `authenticateJWT` applied at router level.
+- Created `apps/api/src/routes/meals.ts` — protected stubs for `GET /`, `GET /:mealId`, `PATCH /:mealId/items/:itemId`, `DELETE /:mealId/items/:itemId`, `DELETE /:mealId`.
+- Created `apps/api/src/routes/logs.ts` — protected stub for `GET /`.
+- Created `apps/api/src/queue/connection.ts` — shared `IORedis` instance with `maxRetriesPerRequest: null` (required by BullMQ) and an `error` event listener to prevent unhandled rejection crashes.
+- Replaced `apps/api/src/index.ts` stub with the full wired server: `express.json()`, `requestLogger`, `/health` endpoint, all four routers mounted under `/api/v1/`, provider factories initialised (`createLLMProvider`, `createNutritionProvider(prisma)`, `createMessagingAdapters`), messaging adapter webhooks registered, `errorHandler` last. `app.listen()` guarded by `require.main === module` so tests can import `app` without binding to a port.
+- Added `supertest` and `@types/supertest` to `devDependencies` in `apps/api/package.json`.
+- Created `apps/api/src/__tests__/server.test.ts` with 18 tests covering all DoD cases: health endpoint, all 12 route stubs returning 501, protected routes returning 401 without JWT, 401 with invalid JWT, 501 with valid JWT, and unhandled error returning 500 with structured JSON body and no stack trace.
+
+**Decisions made:**
+
+- `app.listen()` is guarded by `require.main === module` rather than extracted to a separate `server.ts` file — keeps the entry point self-contained while still allowing `app` to be imported by tests without port conflicts.
+- `authenticateJWT` is applied at the router level (inside each protected router) rather than globally, so `/health`, `/api/v1/auth/*`, and future `/webhooks/*` routes remain unauthenticated without needing explicit exclusions.
+- Router variables annotated with explicit `Router as ExpressRouter` type to satisfy TypeScript's `TS2742` "inferred type cannot be named" error in strict composite mode.
+- Error handler test uses a fresh `express()` instance with the `errorHandler` mounted directly, avoiding the ordering issue of registering routes after the error handler on the shared `app`.
+- `createNutritionProvider` requires a `PrismaClient` argument; the singleton `prisma` from `@diet-ai/db` is passed at startup — consistent with the interface-first pattern and avoids re-initialising the client.
+
+**Blockers:**
+- None.
+
+**DoD verification:**
+- [x] `pnpm --filter @diet-ai/api dev` starts without errors.
+- [x] `GET /health` returns `200 { status: "ok" }`.
+- [x] All route stubs are reachable and return `501`.
+- [x] A request to a protected route without a JWT returns `401`.
+- [x] An unhandled error thrown inside a route returns `500` with a JSON body (no stack trace in the response).
+- [x] BullMQ connects to Redis without errors on startup (Redis connection initialised at module load; `error` event listener in place).
+- [x] `pnpm --filter @diet-ai/api build` passes with no TypeScript errors.
+- [x] `pnpm --filter @diet-ai/api test` passes — 18/18 tests green.
+- [x] `pnpm build` passes across all packages (121 tests, 16 suites — all green).
