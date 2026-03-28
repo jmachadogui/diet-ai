@@ -9,8 +9,12 @@ jest.mock("@diet-ai/llm", () => ({ createLLMProvider: jest.fn(() => ({})) }));
 jest.mock("@diet-ai/nutrition", () => ({ createNutritionProvider: jest.fn(() => ({})) }));
 jest.mock("@diet-ai/messaging", () => ({
   createMessagingAdapters: jest.fn(() => [
-    { registerWebhook: jest.fn(), platform: "telegram" },
+    { registerWebhook: jest.fn(), onMessage: jest.fn(), platform: "telegram" },
   ]),
+}));
+jest.mock("bullmq", () => ({
+  Queue: jest.fn().mockImplementation(() => ({ add: jest.fn() })),
+  Worker: jest.fn().mockImplementation(() => ({ on: jest.fn() })),
 }));
 jest.mock("@diet-ai/db", () => ({ prisma: {} }));
 jest.mock("../queue/connection", () => ({
