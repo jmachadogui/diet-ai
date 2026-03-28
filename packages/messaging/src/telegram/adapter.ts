@@ -4,6 +4,27 @@ import type { IncomingMessage, OutgoingMessage } from "@diet-ai/shared";
 import type { MessagingAdapter } from "../adapter";
 import { MessagingAdapterError } from "../adapter";
 
+function makeVerifyRequest(apiBaseUrl: string, token: string, platformUserId: string): Promise<{ ok: boolean; message?: string }> {
+  return new Promise((resolve) => {
+    const url = new URL(`${apiBaseUrl}/api/v1/auth/magic-link/verify?token=${encodeURIComponent(token)}&platformUserId=${encodeURIComponent(platformUserId)}`);
+    const lib = url.protocol === "https:" ? require("https") : require("http");
+    lib.get(url.toString(), (res: any) => {
+      let data = "";
+      res.on("data", (chunk: string) => { data += chunk; });
+      res.on("end", () => {
+        try {
+          const body = JSON.parse(data);
+          resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, message: body.message ?? body.error });
+        } catch {
+          resolve({ ok: false, message: "Unexpected response from server" });
+        }
+      });
+    }).on("error", () => {
+      resolve({ ok: false, message: "Failed to reach verification server" });
+    });
+  });
+}
+
 function mapTelegramUpdate(ctx: {
   message: { message_id: number; text: string; date: number };
   from: { id: number };
@@ -25,9 +46,29 @@ export class TelegramAdapter implements MessagingAdapter {
 
   constructor(
     private readonly botToken: string = process.env.TELEGRAM_BOT_TOKEN ?? "",
-    private readonly secretToken: string = process.env.TELEGRAM_WEBHOOK_SECRET ?? ""
+    private readonly secretToken: string = process.env.TELEGRAM_WEBHOOK_SECRET ?? "",
+    private readonly apiBaseUrl: string = process.env.API_BASE_URL ?? "http://localhost:3000"
   ) {
     this.bot = new Telegraf(this.botToken);
+
+    this.bot.command("start", async (ctx) => {
+      const args = (ctx.message as any).text?.split(" ") ?? [];
+      const token = args[1];
+      const platformUserId = String(ctx.from.id);
+
+      if (!token) {
+        await ctx.reply("Welcome! To link your Telegram account, please generate a magic link from the web app settings.");
+        return;
+      }
+
+      const result = await makeVerifyRequest(this.apiBaseUrl, token, platformUserId);
+      if (result.ok) {
+        await ctx.reply("Your Telegram account is now linked to your web account!");
+      } else {
+        await ctx.reply(`Failed to link account: ${result.message ?? "Invalid or expired link."}`);
+      }
+    });
+
     this.bot.on("text", async (ctx) => {
       if (!this.handler) return;
       const msg = mapTelegramUpdate(ctx as any);
