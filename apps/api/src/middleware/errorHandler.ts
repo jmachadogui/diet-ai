@@ -23,6 +23,24 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class BadRequestError extends AppError {
+  constructor(message = "Bad Request") {
+    super(400, "BAD_REQUEST", message);
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(message = "Conflict") {
+    super(409, "CONFLICT", message);
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(message = "Not Found") {
+    super(404, "NOT_FOUND", message);
+  }
+}
+
 export function errorHandler(
   err: unknown,
   _req: Request,
