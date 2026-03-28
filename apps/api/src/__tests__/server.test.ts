@@ -1,6 +1,10 @@
 import request from "supertest";
 import jwt from "jsonwebtoken";
 
+jest.mock("bcrypt", () => ({
+  hash: jest.fn(async () => "$2b$10$mockedhash"),
+  compare: jest.fn(async () => true),
+}));
 jest.mock("@diet-ai/llm", () => ({ createLLMProvider: jest.fn(() => ({})) }));
 jest.mock("@diet-ai/nutrition", () => ({ createNutritionProvider: jest.fn(() => ({})) }));
 jest.mock("@diet-ai/messaging", () => ({
@@ -30,15 +34,11 @@ describe("Route stubs return 501", () => {
   const authHeader = `Bearer ${validToken}`;
 
   const publicStubs: Array<[string, string]> = [
-    ["post", "/api/v1/auth/register"],
-    ["post", "/api/v1/auth/login"],
     ["post", "/api/v1/auth/magic-link/generate"],
     ["get", "/api/v1/auth/magic-link/verify"],
   ];
 
   const protectedStubs: Array<[string, string]> = [
-    ["get", "/api/v1/users/me"],
-    ["patch", "/api/v1/users/me"],
     ["get", "/api/v1/meals"],
     ["get", "/api/v1/meals/some-id"],
     ["patch", "/api/v1/meals/some-id/items/some-item"],
