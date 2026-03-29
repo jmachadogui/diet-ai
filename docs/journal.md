@@ -378,3 +378,62 @@ Created one file per entity under `packages/db/src/repositories/`:
 - [x] `pnpm --filter @diet-ai/api test` passes — 46/46 tests green.
 - [x] `pnpm build` passes across all packages.
 - [x] `pnpm test` passes across all packages — 149/149 tests green across 19 suites.
+
+---
+
+## 2026-03-29 — Hotfix: bcrypt native addon & MagicLinkToken type mismatch
+
+**Branch:** `feat/t-08-auth-registration-login-jwt` / `feat/t-09-auth-magic-link-platform-linking`
+
+### Issue 1 — `bcrypt` native addon not compiled (`MODULE_NOT_FOUND`)
+
+**Symptom:** `pnpm --filter @diet-ai/api dev` crashed immediately with:
+```
+Error: Cannot find module '.../bcrypt/lib/binding/napi-v3/bcrypt_lib.node'
+```
+The `binding/` directory did not exist — the native addon was never compiled for the current Node.js version (v20.20.0).
+
+**Fix:** Replaced `bcrypt` (native C++ addon) with `bcryptjs` (pure JavaScript, identical API, no compilation required).
+- Added `bcryptjs` to `dependencies` and `@types/bcryptjs` to `devDependencies` in `apps/api/package.json`.
+- Updated import in `apps/api/src/services/authService.ts`: `import bcrypt from "bcrypt"` → `import bcrypt from "bcryptjs"`.
+- Updated `jest.mock("bcrypt", ...)` → `jest.mock("bcryptjs", ...)` and `require("bcrypt")` → `require("bcryptjs")` in `apps/api/src/__tests__/auth.test.ts`, `server.test.ts`, and `magicLink.test.ts`.
+
+### Issue 2 — `magicLinkService.ts` TS2561: `userId` not in `MagicLinkTokenCreateInput`
+
+**Symptom:** After the bcrypt fix, nodemon restarted and hit a TypeScript compile error:
+```
+src/services/magicLinkService.ts(17,23): error TS2561: Object literal may only specify known properties,
+but 'userId' does not exist in type 'MagicLinkTokenCreateInput'. Did you mean to write 'user'?
+```
+`createToken` in `packages/db/src/repositories/magicLinkToken.repository.ts` was typed with `Prisma.MagicLinkTokenCreateInput`, which requires the relational connect syntax (`user: { connect: { id } }`). The call site in `magicLinkService.ts` passes a flat `userId` scalar.
+
+**Fix:** Changed the parameter type in `magicLinkToken.repository.ts` from `Prisma.MagicLinkTokenCreateInput` to `Prisma.MagicLinkTokenUncheckedCreateInput`, which accepts scalar foreign keys directly.
+
+### Verification
+- `pnpm --filter @diet-ai/api test` — 46/46 tests green.
+- `pnpm --filter @diet-ai/api dev` — `API server listening on port 3000` with no errors.
+
+---
+
+## 2026-03-29 — Hotfix: `TELEGRAM_BOT_NAME` not loaded from `.env`
+
+**Branch:** `feat/t-09-auth-magic-link-platform-linking`
+
+### Issue — `TELEGRAM_BOT_NAME` env var not picked up at runtime
+
+**Symptom:** The magic-link deep link URL was always generated with the placeholder `YourBotName` even after adding `TELEGRAM_BOT_NAME` to the root `.env` file.
+
+**Root cause:** `apps/api` had no `dotenv` setup. Running `pnpm --filter @diet-ai/api dev` does not automatically load any `.env` file — env vars must already be present in the shell environment or loaded explicitly at startup.
+
+**Fix:**
+- Added `dotenv` to `apps/api` dependencies: `pnpm --filter @diet-ai/api add dotenv`.
+- Added the following as the first three lines of `apps/api/src/index.ts` so the root `.env` is loaded before any other module reads `process.env`:
+  ```ts
+  import dotenv from "dotenv";
+  import path from "path";
+  dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+  ```
+  The path resolves to the monorepo root `.env` regardless of where the process is started from.
+
+### Verification
+- Restarting `pnpm --filter @diet-ai/api dev` now picks up all variables from the root `.env`, including `TELEGRAM_BOT_NAME`.
