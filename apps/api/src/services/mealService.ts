@@ -1,5 +1,5 @@
 import { createMealWithItems, findMealsByDay, findUserById } from "@diet-ai/db";
-import type { Meal } from "@diet-ai/db";
+import type { Meal, Prisma } from "@diet-ai/db";
 import type { NutritionResult } from "@diet-ai/shared";
 import type { MealOccasion } from "@diet-ai/shared";
 
@@ -45,7 +45,7 @@ export async function createMealFromItems(data: CreateMealData) {
     fatG: item.nutrition.fat_g,
     nutritionApi: "fatsecret",
     apiRefId: item.nutrition.api_ref_id,
-    apiResponseSnapshot: item.nutrition.api_response_snapshot,
+    apiResponseSnapshot: item.nutrition.api_response_snapshot as Prisma.InputJsonValue,
     resolutionConfidence: item.nutrition.resolution_confidence,
   }));
 

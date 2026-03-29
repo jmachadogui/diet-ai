@@ -12,6 +12,7 @@ export * from './repositories/editHistory.repository'
 
 export type {
   PrismaClient,
+  Prisma,
   User,
   UserIdentity,
   MagicLinkToken,

@@ -1,7 +1,7 @@
 import request from "supertest";
 import jwt from "jsonwebtoken";
 
-jest.mock("bcrypt", () => ({
+jest.mock("bcryptjs", () => ({
   hash: jest.fn(async (_data: string, _rounds: number) => "$2b$10$mockedhash"),
   compare: jest.fn(async (_data: string, _hash: string) => true),
 }));
@@ -32,7 +32,7 @@ process.env.JWT_SECRET = "test-secret";
 
 const { app } = require("../index");
 const db = require("@diet-ai/db");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 
 const mockUser = {
   id: "user-1",
