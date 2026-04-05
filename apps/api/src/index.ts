@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+import path from "path";
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 import express, { type Express } from "express";
 import { Queue } from "bullmq";
 import { prisma } from "@diet-ai/db";

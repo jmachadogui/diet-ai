@@ -8,6 +8,20 @@ import { computeNormalizedQueryHash } from "./cacheKey";
 
 const FATSECRET_API_URL = "https://platform.fatsecret.com/rest/server.api";
 
+function checkFatSecretError(data: unknown): void {
+  const error = (data as Record<string, unknown>)?.error as Record<string, unknown> | undefined;
+  if (!error) return;
+  const code = error.code as number;
+  const message = error.message as string;
+  if (code === 21) {
+    throw new NutritionAPIError(
+      `FatSecret rejected the request: IP address not whitelisted (code 21). Add your server's public IP to the FatSecret developer portal. Original message: ${message}`,
+      error
+    );
+  }
+  throw new NutritionAPIError(`FatSecret API error (code ${code}): ${message}`, error);
+}
+
 export class FatSecretProvider implements NutritionProvider {
   readonly vendorName = "fatsecret";
 
@@ -43,6 +57,7 @@ export class FatSecretProvider implements NutritionProvider {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      checkFatSecretError(searchResponse.data);
       const foods = searchResponse.data?.foods?.food;
       if (!foods) {
         return notFoundResult(query.food_name);
@@ -51,6 +66,7 @@ export class FatSecretProvider implements NutritionProvider {
       const food = Array.isArray(foods) ? foods[0] : foods;
       foodId = food.food_id as string;
     } catch (err) {
+      if (err instanceof NutritionAPIError) throw err;
       if (axios.isAxiosError(err) && err.response) {
         throw new NutritionAPIError(`FatSecret API error: ${err.response.status}`, err);
       }
@@ -69,10 +85,12 @@ export class FatSecretProvider implements NutritionProvider {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      checkFatSecretError(getResponse.data);
       rawFood = getResponse.data?.food as Record<string, unknown>;
       const servings = (rawFood?.servings as Record<string, unknown>)?.serving;
       serving = (Array.isArray(servings) ? servings[0] : servings) as FatSecretServing;
     } catch (err) {
+      if (err instanceof NutritionAPIError) throw err;
       if (axios.isAxiosError(err) && err.response) {
         throw new NutritionAPIError(`FatSecret API error: ${err.response.status}`, err);
       }
@@ -90,12 +108,12 @@ export class FatSecretProvider implements NutritionProvider {
 
     await this.prisma.apiCache.upsert({
       where: { normalizedQueryHash: hash },
-      update: { nutritionData: result, fetchedAt: new Date(), expiresAt },
+      update: { nutritionData: result as object, fetchedAt: new Date(), expiresAt },
       create: {
         vendor: this.vendorName,
         queryString: query.food_name,
         normalizedQueryHash: hash,
-        nutritionData: result,
+        nutritionData: result as object,
         fetchedAt: new Date(),
         expiresAt,
       },
