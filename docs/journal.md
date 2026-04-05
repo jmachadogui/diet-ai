@@ -224,3 +224,157 @@ Created one file per entity under `packages/db/src/repositories/`:
 - [x] `pnpm --filter @diet-ai/api build` passes with no TypeScript errors.
 - [x] `pnpm --filter @diet-ai/api test` passes — 18/18 tests green.
 - [x] `pnpm build` passes across all packages (121 tests, 16 suites — all green).
+
+---
+
+## 2026-03-28 — T-08: Auth — Registration, Login & JWT
+
+**Branch:** `feat/t-08-auth-registration-login-jwt`
+
+**Steps taken:**
+
+- Read `docs/tasks.md §T-08`, `tdd.md §10`, `apps/api/src/middleware/authenticate.ts`, and confirmed T-02 and T-07 are complete.
+- Created `docs/plans/t-08-plan.md` with a 12-step implementation plan covering: error handler updates, service layer creation, route implementation, unit tests, and build/test verification.
+- Created feature branch `feat/t-08-auth-registration-login-jwt` off `master`.
+- Added `ConflictError`, `BadRequestError`, and `NotFoundError` to `apps/api/src/middleware/errorHandler.ts` to complement existing error classes.
+- Created `apps/api/src/services/authService.ts` with `register()` and `login()` functions implementing full auth flow: bcrypt password hashing, JWT generation, duplicate email handling.
+- Created `apps/api/src/services/userService.ts` with `sanitizeUser()`, `getProfile()`, and `updateProfile()` functions implementing user profile operations with weight history tracking.
+- Replaced 501 stubs in `apps/api/src/routes/auth.ts` with real implementations for `POST /register` and `POST /login` using Zod validation and authService calls.
+- Replaced 501 stubs in `apps/api/src/routes/users.ts` with real implementations for `GET /me` and `PATCH /me` using Zod validation and userService calls.
+- Added `zod` dependency to `apps/api/package.json`.
+- Created `apps/api/src/__tests__/auth.test.ts` with 17 unit tests covering all DoD scenarios: registration success, duplicate email handling, login success, wrong credentials handling, profile retrieval, profile updates, weight history tracking.
+- Updated `apps/api/src/__tests__/server.test.ts` to remove T-08 routes from the 501 stubs list and add bcrypt mock.
+- Ran `pnpm build` and `pnpm test` — both passed (134 tests, 17 suites — all green).
+
+**Decisions made:**
+
+- `passwordHash` is never returned in any API response; `sanitizeUser()` utility strips it from all User objects before serialization.
+- JWT payload strictly follows the specification: `{ sub: userId, email }` with 7-day expiry.
+- Password hashing uses bcrypt with 10 rounds; verified in tests that `bcrypt.hash` is called with the correct arguments.
+- Repository helpers from `@diet-ai/db` are used exclusively for all database operations; no raw Prisma calls in service files.
+- Weight changes are automatically tracked in `UserWeightHistory` when `weightKg` is updated via profile PATCH endpoint.
+
+**Blockers:**
+- None.
+
+**DoD verification:**
+- [x] `POST /register` creates a `User` row; password is stored as a bcrypt hash (never plaintext).
+- [x] `POST /login` returns a valid JWT for correct credentials and `401` for wrong credentials.
+- [x] `GET /users/me` returns the user profile when a valid JWT is provided.
+- [x] `PATCH /users/me` updates profile fields and writes a `UserWeightHistory` row when `weight_kg` changes.
+- [x] Unit tests cover: duplicate email on register → `409`, missing required fields → `400`, invalid JWT → `401`.
+- [x] `pnpm --filter @diet-ai/api build` passes with no TypeScript errors.
+- [x] `pnpm --filter @diet-ai/api test` passes — 17/17 tests green in auth suite.
+- [x] `pnpm build` passes across all packages (134 tests, 17 suites — all green).
+- [x] `pnpm test` passes across all packages (134 tests, 17 suites — all green).
+
+---
+
+## 2026-03-28 — T-09: Auth — Magic Link & Platform Linking
+
+**Branch:** `feat/t-09-auth-magic-link-platform-linking`
+**PR:** https://github.com/jmachadogui/diet-ai/pull/9
+
+**Steps taken:**
+
+- Read `docs/tasks.md §T-09`, `docs/plans/t-09-plan.md`, `tdd.md §10`, and confirmed T-08 is complete.
+- Created `apps/api/src/services/magicLinkService.ts`:
+  - `generateMagicLink(userId, platform)` — generates a 32-byte hex token via `crypto.randomBytes`, persists it with a 15-minute expiry via `createToken()`, returns `{ token, deepLinkUrl }` where the deep link is `https://t.me/<TELEGRAM_BOT_NAME>?start=<token>`.
+  - `verifyMagicLink(token, platformUserId)` — calls `findValidToken()` (single Prisma query filtering by expiry and `usedAt IS NULL`), throws `BadRequestError` if not found, marks token used via `markTokenUsed()`, upserts `UserIdentity` via `upsertIdentity()`.
+- Updated `apps/api/src/routes/auth.ts`:
+  - Replaced `POST /magic-link/generate` 501 stub with real implementation; requires JWT auth, validates `{ platform: z.enum(["telegram"]) }` body.
+  - Replaced `GET /magic-link/verify` 501 stub with real implementation; validates `{ token, platformUserId }` query params; public endpoint (no JWT required).
+- Updated `packages/messaging/src/telegram/adapter.ts`:
+  - Added `bot.command("start", ...)` handler before the generic `text` handler.
+  - Extracts token from `/start <token>` argument; if present, makes an internal HTTP GET to `${API_BASE_URL}/api/v1/auth/magic-link/verify?token=...&platformUserId=...` and replies with success or failure message.
+  - If no token, replies with welcome/instructions message.
+  - `apiBaseUrl` injected via constructor (defaults to `process.env.API_BASE_URL ?? "http://localhost:3000"`).
+- Created `apps/api/src/__tests__/magicLink.test.ts` with 12 unit tests covering all DoD scenarios.
+- Updated `apps/api/src/__tests__/server.test.ts` to remove magic link routes from the 501 stubs list.
+- Fixed `magicLink.test.ts` to include `bcrypt` mock (same pattern as `auth.test.ts`).
+
+**Decisions made:**
+
+- `findValidToken()` in `packages/db` already filters by `expiresAt > now` AND `usedAt IS NULL` in a single Prisma query — expired and already-used tokens both return `null`, so no separate checks are needed in the service layer.
+- `platformUserId` is passed as a query param to the verify endpoint rather than derived server-side, keeping the endpoint stateless and avoiding any session coupling.
+- The Telegram adapter makes an internal HTTP call rather than importing `magicLinkService` directly, preserving the `packages/messaging` → `apps/api` package boundary.
+- Deep link URL uses `TELEGRAM_BOT_NAME` env var to avoid hardcoding the bot username.
+
+**Blockers:**
+- None.
+
+**DoD verification:**
+- [x] `POST /magic-link/generate` returns a token and a valid Telegram deep link URL.
+- [x] `GET /magic-link/verify` with a valid token creates a `UserIdentity` row and marks the token as used.
+- [x] A second call to verify with the same token returns `400` (`findValidToken` returns `null` for used tokens).
+- [x] A call to verify with an expired token returns `400` (`findValidToken` returns `null` for expired tokens).
+- [x] After linking, `upsertIdentity` is called with the correct `userId` from the token — verified in test suite.
+- [x] Unit tests cover: expired token, already-used token, unknown token — all return `400` with a descriptive message.
+- [x] `pnpm --filter @diet-ai/api build` passes with no TypeScript errors.
+- [x] `pnpm --filter @diet-ai/api test` passes — 41/41 tests green.
+- [x] `pnpm build` passes across all packages.
+- [x] `pnpm test` passes across all packages — 144/144 tests green across 18 suites.
+
+## 2026-03-28 — T-10: End-to-End Message Processing Pipeline (BullMQ Worker)
+
+### Created feature branch
+- Branched off `master` into `feat/t-10-core-pipeline-message-processing-worker` before making any changes.
+
+### Step 1 — Created `apps/api/src/services/logService.ts`
+- Thin wrapper over `packages/db` log repository helpers, keeping raw DB calls out of the worker.
+- Exports: `createLog()`, `updateLogSuccess()`, `updateLogFailed()`, `setClarificationPrompt()`, `setClarificationResponse()`, `markLogAbandoned()`.
+
+### Step 2 — Created `apps/api/src/services/mealService.ts`
+- Creates `Meal` + `MealItem` records and aggregates daily summaries.
+- Exports: `createMealFromItems()`, `getDailySummary()`.
+- Imports `Meal` type from `@diet-ai/db` to satisfy strict-mode `implicit any` in reduce callbacks.
+
+### Step 3 — Created `apps/api/src/workers/messageProcessor.ts`
+- Core BullMQ worker with full pipeline: identity lookup → abandoned clarification detection → LLM parsing → intent routing → nutrition lookup → meal creation → reply sending.
+- `resolveParsedResult()` checks Redis first; if a clarification key exists, treats the current message as a clarification response and re-parses the combined text.
+- `runLogMealFlow()` performs the full nutrition + meal creation flow and sends a formatted reply.
+- `runEditMealFlow()` and `runSummaryFlow()` are stubs (T-12 and T-13 respectively).
+- `consumedAt` falls back to `job.data.messageTimestamp` when the LLM does not return a timestamp.
+
+### Step 4 — Created `apps/api/src/workers/index.ts`
+- BullMQ Worker bootstrap. Exports `startWorkers(adapters, llmProvider, nutritionProvider, redis)`.
+- Concurrency driven by `QUEUE_CONCURRENCY` env var (default 5).
+- Uses `redis as any` cast to work around ioredis 5.9.3 vs 5.10.0 type mismatch between bullmq and apps/api.
+
+### Step 5 — Modified `apps/api/src/index.ts`
+- Added BullMQ `Queue` instantiation with `redisConnection as any` cast.
+- Wired `adapter.onMessage()` for each messaging adapter to enqueue `MessageProcessJob` jobs.
+- `startWorkers()` called inside the `require.main === module` guard.
+
+### Step 6 — Created `apps/api/src/__tests__/messageProcessor.integration.test.ts`
+- 4 test scenarios: happy path meal log, unlinked user, nutrition API failure, clarification flow (2 sub-tests).
+- All mocks via `jest.mock` — no real DB/Redis/LLM/HTTP calls.
+- 5 tests, all passing.
+
+### Step 7 — Fixed existing tests
+- Added `onMessage: jest.fn()` to the messaging adapter mock in `auth.test.ts`, `server.test.ts`, and `magicLink.test.ts`.
+- Added `jest.mock("bullmq", ...)` with Queue and Worker mocks to all three files.
+
+**Decisions made:**
+
+- `onMessage` handler only enqueues jobs; all heavy processing (LLM + nutrition API) happens inside the BullMQ worker — keeps the HTTP request cycle fast.
+- Redis clarification state uses a 300 s TTL key `clarification:<userId>:<platform>` to track pending clarification prompts.
+- Abandoned clarification detection: at the start of every job, if no Redis key exists but a recent `Log` with `processingStatus: "processing"` and non-null `clarificationPrompt` is found, it is marked `"abandoned"` before proceeding.
+- `Queue<MessageProcessJob, void, "message-process">` with explicit name type literal avoids TS2345 on `queue.add()`.
+- `defaultJobOptions` removed from `WorkerOptions` — in BullMQ v5 retry config belongs on the Queue side.
+
+**Blockers:**
+- None.
+
+**DoD verification:**
+- [x] `onMessage` callback enqueues a `MessageProcessJob` for every inbound message.
+- [x] Worker resolves `UserIdentity` and returns `400`-equivalent reply for unlinked users.
+- [x] LLM `parseMessage()` called with correct payload; result drives intent routing.
+- [x] `log_meal` intent: nutrition lookup → `createMealFromItems()` → success reply with macro summary.
+- [x] Nutrition API failure: worker catches error, marks log `failed`, sends error reply.
+- [x] Clarification flow: Redis key set → next message treated as clarification response → re-parsed.
+- [x] Abandoned clarification: prior `processing` log marked `abandoned` when no Redis key present.
+- [x] `pnpm --filter @diet-ai/api build` passes with no TypeScript errors.
+- [x] `pnpm --filter @diet-ai/api test` passes — 46/46 tests green.
+- [x] `pnpm build` passes across all packages.
+- [x] `pnpm test` passes across all packages — 149/149 tests green across 19 suites.
