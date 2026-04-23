@@ -1,3 +1,5 @@
+This file is the primary constraint for all AI interactions. Before performing any task, verify your plan against the rules defined here and the dependencies in docs/tasks.md.
+
 # Agent Instructions
 
 Read this file before every prompt. No exceptions.

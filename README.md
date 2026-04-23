@@ -232,7 +232,7 @@ Fill in the required values (see [Environment Variables](#environment-variables)
 **4. Run database migrations**
 
 ```bash
-pnpm --filter @diet-ai/db migrate:dev
+pnpm --filter @diet-ai/db db:migrate
 ```
 
 **5. Start the API**
@@ -241,7 +241,7 @@ pnpm --filter @diet-ai/db migrate:dev
 pnpm --filter @diet-ai/api dev
 ```
 
-The API starts with `ts-node --watch` on the port defined in your `.env`.
+The API starts with `ts-node --watch` on port `3000` by default (override with `PORT` env var).
 
 **6. Start the web app**
 
@@ -256,6 +256,83 @@ To start both apps in parallel:
 ```bash
 pnpm dev
 ```
+
+---
+
+## Testing with Telegram
+
+### 1. Create a Telegram bot
+
+Talk to [@BotFather](https://t.me/BotFather) on Telegram and run `/newbot`. Follow the prompts — you'll receive a bot token like `7123456789:AAF...`. Set it as `TELEGRAM_BOT_TOKEN` in your `.env`.
+
+### 2. Get external API credentials
+
+- **AbacusAI:** Log in at [abacus.ai](https://abacus.ai), go to Settings → API Keys, and create a key. Set it as `ABACUSAI_API_KEY`.
+- **FatSecret:** Register at [platform.fatsecret.com](https://platform.fatsecret.com/api/Default.aspx), create an app, and copy the Client ID and Client Secret into `FATSECRET_CLIENT_ID` and `FATSECRET_CLIENT_SECRET`.
+
+### 3. Choose secret values
+
+`JWT_SECRET` and `TELEGRAM_WEBHOOK_SECRET` are strings you choose yourself — they are not obtained from any external service.
+
+- `JWT_SECRET` is used to sign and verify JWTs. Use any random string locally, or generate one with `openssl rand -base64 32`.
+- `TELEGRAM_WEBHOOK_SECRET` is a shared secret included by Telegram in every webhook request so your API can verify the call is genuine. Pick any random string and use the same value in both `.env` and the `setWebhook` call below.
+
+### 4. Expose the API to the internet
+
+Telegram requires a publicly reachable HTTPS URL to deliver webhook updates. Use [ngrok](https://ngrok.com) to tunnel your local server:
+
+```bash
+ngrok http 3000
+```
+
+Copy the HTTPS URL it gives you, e.g. `https://abc123.ngrok-free.app`.
+
+### 5. Register the Telegram webhook
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://abc123.ngrok-free.app/webhooks/telegram",
+    "secret_token": "<TELEGRAM_WEBHOOK_SECRET>"
+  }'
+```
+
+A successful response looks like `{"ok":true,"result":true}`.
+
+### 6. Link your Telegram account
+
+Register a user and generate a magic link:
+
+```bash
+# Register
+curl -X POST http://localhost:3000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com", "password": "yourpassword"}'
+
+# Login — copy the token from the response
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com", "password": "yourpassword"}'
+
+# Generate a magic link
+curl -X POST http://localhost:3000/api/v1/auth/magic-link/generate \
+  -H "Authorization: Bearer <jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"platform": "telegram"}'
+```
+
+The response includes a `telegramUrl`. Open it on your phone — it will launch your bot with a `/start <token>` deep link that links your Telegram account to your user.
+
+### 7. Log a meal
+
+Send a message to your bot, for example:
+
+```
+I had 2 scrambled eggs and a slice of toast for breakfast
+```
+
+The bot will reply with a macro summary (calories, protein, carbs, fat).
 
 ---
 

@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/generated dist/generated",
     "dev": "tsc --watch",
     "test": "jest",
     "postinstall": "prisma generate",
