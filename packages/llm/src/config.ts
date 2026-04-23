@@ -1,4 +1,4 @@
 export const LLM_MODELS = {
-  parse: process.env.ABACUSAI_PARSE_MODEL ?? "claude-sonnet-4-5",
-  edit:  process.env.ABACUSAI_EDIT_MODEL  ?? "claude-sonnet-4-5",
+  parse: process.env.OPENAI_PARSE_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+  edit: process.env.OPENAI_EDIT_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
 } as const;

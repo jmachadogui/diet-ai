@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { AbacusAIProvider } from "../abacusai";
+import { OpenAIProvider } from "../openai";
 
 function makeMockClient(content: string | null) {
   return {
@@ -32,9 +32,9 @@ const VALID_EDIT_PAYLOAD = {
   clarification_question: null,
 };
 
-describe("AbacusAIProvider.parseMessage", () => {
+describe("OpenAIProvider.parseMessage", () => {
   it("returns a valid MealParseResult for a well-formed response", async () => {
-    const provider = new AbacusAIProvider(makeMockClient(JSON.stringify(VALID_PARSE_PAYLOAD)));
+    const provider = new OpenAIProvider(makeMockClient(JSON.stringify(VALID_PARSE_PAYLOAD)));
     const result = await provider.parseMessage("200g chicken breast for lunch", "2026-03-25", "12:30");
     expect(result.intent).toBe("log_meal");
     expect(result.needs_clarification).toBe(false);
@@ -43,13 +43,13 @@ describe("AbacusAIProvider.parseMessage", () => {
   });
 
   it("throws LLMParseError with 'Malformed JSON' for invalid JSON", async () => {
-    const provider = new AbacusAIProvider(makeMockClient("not valid json {"));
+    const provider = new OpenAIProvider(makeMockClient("not valid json {"));
     await expect(provider.parseMessage("test", "2026-03-25", "12:30"))
       .rejects.toMatchObject({ name: "LLMParseError", message: expect.stringContaining("Malformed JSON") });
   });
 
   it("throws LLMParseError with 'Schema mismatch' for valid JSON that fails schema", async () => {
-    const provider = new AbacusAIProvider(makeMockClient(JSON.stringify({ foo: "bar" })));
+    const provider = new OpenAIProvider(makeMockClient(JSON.stringify({ foo: "bar" })));
     await expect(provider.parseMessage("test", "2026-03-25", "12:30"))
       .rejects.toMatchObject({ name: "LLMParseError", message: expect.stringContaining("Schema mismatch") });
   });
@@ -60,36 +60,36 @@ describe("AbacusAIProvider.parseMessage", () => {
       needs_clarification: true,
       clarification_question: "Did you have fried or grilled chicken?",
     };
-    const provider = new AbacusAIProvider(makeMockClient(JSON.stringify(payload)));
+    const provider = new OpenAIProvider(makeMockClient(JSON.stringify(payload)));
     const result = await provider.parseMessage("I had chicken", "2026-03-25", "12:30");
     expect(result.needs_clarification).toBe(true);
     expect(result.clarification_question).not.toBeNull();
   });
 
   it("throws LLMParseError when API returns null content", async () => {
-    const provider = new AbacusAIProvider(makeMockClient(null));
+    const provider = new OpenAIProvider(makeMockClient(null));
     await expect(provider.parseMessage("test", "2026-03-25", "12:30"))
       .rejects.toMatchObject({ name: "LLMParseError" });
   });
 });
 
-describe("AbacusAIProvider.editMessage", () => {
+describe("OpenAIProvider.editMessage", () => {
   it("returns a valid EditInstruction for a well-formed response", async () => {
-    const provider = new AbacusAIProvider(makeMockClient(JSON.stringify(VALID_EDIT_PAYLOAD)));
+    const provider = new OpenAIProvider(makeMockClient(JSON.stringify(VALID_EDIT_PAYLOAD)));
     const result = await provider.editMessage("remove chicken from lunch", "2026-03-25", []);
     expect(result.intent).toBe("edit_meal");
     expect(result.operations).toHaveLength(1);
   });
 
   it("throws LLMParseError with 'Malformed JSON' for invalid JSON", async () => {
-    const provider = new AbacusAIProvider(makeMockClient("{ bad json"));
+    const provider = new OpenAIProvider(makeMockClient("{ bad json"));
     await expect(provider.editMessage("test", "2026-03-25", []))
       .rejects.toMatchObject({ name: "LLMParseError", message: expect.stringContaining("Malformed JSON") });
   });
 
   it("throws LLMParseError with 'Schema mismatch' for empty operations array", async () => {
     const payload = { ...VALID_EDIT_PAYLOAD, operations: [] };
-    const provider = new AbacusAIProvider(makeMockClient(JSON.stringify(payload)));
+    const provider = new OpenAIProvider(makeMockClient(JSON.stringify(payload)));
     await expect(provider.editMessage("test", "2026-03-25", []))
       .rejects.toMatchObject({ name: "LLMParseError", message: expect.stringContaining("Schema mismatch") });
   });
