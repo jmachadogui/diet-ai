@@ -44,7 +44,7 @@ The system is a chat-first calorie tracker. Users log meals in natural language 
 
 **Core design principles:**
 - **Messaging-agnostic:** all chat platform logic sits behind a `MessagingAdapter` interface. Telegram is the first implementation; WhatsApp and Discord can be added without touching core logic.
-- **LLM-agnostic:** all LLM calls go through an `LLMProvider` interface. AbacusAI RouteLLM is the default implementation; any other OpenAI-compatible provider can be swapped by changing configuration.
+- **LLM-agnostic:** all LLM calls go through an `LLMProvider` interface. `OpenAIProvider` is the default implementation; other providers can be swapped by changing configuration.
 - **Nutrition API-agnostic:** all nutrition lookups go through a `NutritionProvider` interface. FatSecret is the first implementation.
 - **TypeScript throughout:** shared Zod schemas enforce type safety across packages.
 - **Monorepo:** all packages live in one repository managed with `pnpm workspaces`.
@@ -108,7 +108,7 @@ diet-ai/
    └──────┬──────┘    └────────┬───────┘   └───────┬────────┘
           │                    │                    │
           ▼                    ▼                    ▼
-     PostgreSQL          AbacusAI RouteLLM        FatSecret
+     PostgreSQL              OpenAI API           FatSecret
                          (configurable)        (configurable)
 
 
@@ -138,8 +138,8 @@ The messaging adapter receives incoming messages and enqueues a `message-process
 
 ### `packages/llm`
 - `LLMProvider` interface (see §5.2).
-- `AbacusAIProvider` implementation (default).
-- Additional provider implementations (e.g. `OpenAIProvider`) can be added following the same interface.
+- `OpenAIProvider` implementation (default).
+- Additional provider implementations can be added following the same interface.
 - Provider factory function: reads `LLM_PROVIDER` env var and returns the correct implementation.
 
 ### `packages/nutrition`
@@ -225,25 +225,23 @@ export interface LLMProvider {
 
 `LLMParseResult` is validated at the provider level with Zod before being returned. If the LLM returns malformed JSON or fails schema validation, the provider throws a typed `LLMParseError`.
 
-**`AbacusAIProvider` implementation details:**
+**`OpenAIProvider` implementation details:**
 
-AbacusAI exposes a RouteLLM API that is fully OpenAI-compatible. The `AbacusAIProvider` uses the `openai` npm package pointed at the AbacusAI base URL:
+`OpenAIProvider` uses the official `openai` npm package against the default OpenAI API endpoint:
 
 ```typescript
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  baseURL: "https://routellm.abacus.ai/v1",
-  apiKey: process.env.ABACUSAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY,
 });
 ```
 
-- **Model:** `"route-llm"` (automatic routing to best available model) or a specific model name via `ABACUSAI_MODEL` env var.
+- **Model:** default from `OPENAI_MODEL`.
 - **Structured output:** uses `response_format: { type: "json_object" }` combined with a system prompt that enforces the schema. The raw string response is parsed and validated with Zod before being returned.
-- **Auth:** Bearer API key via `ABACUSAI_API_KEY` env var.
-- **Base URL:** `https://routellm.abacus.ai/v1` for self-serve accounts.
+- **Auth:** Bearer API key via `OPENAI_API_KEY` env var.
 
-Because the interface uses the standard OpenAI SDK with a custom `baseURL`, swapping to a different OpenAI-compatible provider (e.g. direct OpenAI, Gemini via OpenAI compat layer) requires only a new `baseURL` + `apiKey` — no logic changes.
+Because the interface uses the standard OpenAI SDK behind `LLMProvider`, swapping providers remains a factory/config concern rather than a pipeline code change.
 
 The system prompt instructs the LLM to:
 - Always return valid JSON matching the schema.
@@ -294,18 +292,18 @@ FatSecret OAuth 2.0 token is obtained via Client Credentials flow and cached in-
 
 ### 5.4 LLM Model Configuration
 
-**Default model:** `claude-sonnet-4-5`
+**Default model:** `gpt-4.1-mini`
 
-**Rationale:** Claude Sonnet 4.5 produces reliable structured JSON, respects system prompt constraints (critical for enforcing single-question clarification), and is cost-effective relative to Opus-tier models. It is available on AbacusAI RouteLLM under the name `claude-sonnet-4-5`.
+**Rationale:** `gpt-4.1-mini` provides reliable structured JSON output with low latency and cost, which fits frequent parsing/editing calls in the meal logging pipeline.
 
-**Override:** Configurable via env var. Setting `ABACUSAI_MODEL=route-llm` delegates selection to AbacusAI's automatic router.
+**Override:** Configurable via env var (`OPENAI_MODEL`).
 
 **Per-task model assignment** (`packages/llm/src/config.ts`):
 
 ```typescript
 export const LLM_MODELS = {
-  parse: process.env.ABACUSAI_PARSE_MODEL ?? "claude-sonnet-4-5",
-  edit:  process.env.ABACUSAI_EDIT_MODEL  ?? "claude-sonnet-4-5",
+  parse: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+  edit: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
 } as const;
 ```
 
@@ -952,10 +950,9 @@ REDIS_URL=redis://localhost:6379
 JWT_SECRET=changeme
 
 # LLM
-LLM_PROVIDER=abacusai
-ABACUSAI_API_KEY=
-ABACUSAI_BASE_URL=https://routellm.abacus.ai/v1
-ABACUSAI_MODEL=route-llm
+LLM_PROVIDER=openai
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
 
 # Nutrition API
 NUTRITION_PROVIDER=fatsecret
@@ -1027,7 +1024,7 @@ volumes:
 ### `packages/llm`
 | Package | Purpose |
 |---|---|
-| `openai` | OpenAI-compatible SDK — used with AbacusAI RouteLLM base URL |
+| `openai` | Official OpenAI SDK used by `OpenAIProvider` |
 
 ### `packages/nutrition`
 | Package | Purpose |
@@ -1053,7 +1050,7 @@ volumes:
 
 | # | Decision | Options | Notes |
 |---|---|---|---|
-| 1 | AbacusAI model selection | `route-llm` (auto-routing) vs specific model name | Default: `route-llm`; override via `ABACUSAI_MODEL` env var |
+| 1 | OpenAI model selection | use a single shared model | Default: `gpt-4.1-mini`; override via `OPENAI_MODEL` |
 | 2 | Clarification session state | In-memory Map, Redis, DB flag on LOGS | MVP: Redis key `clarification:<userId>` with 5-min TTL |
 | 3 | Nutrition cache eviction | Query-time TTL check only vs background cron | MVP: query-time only |
 | 4 | FatSecret food match scoring | First result vs keyword scoring | Start with first result; improve if accuracy issues arise |

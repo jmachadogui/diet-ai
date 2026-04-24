@@ -1,12 +1,12 @@
 import { createLLMProvider } from "../factory";
-import { AbacusAIProvider } from "../abacusai";
+import { OpenAIProvider } from "../openai";
 
 describe("createLLMProvider", () => {
   const originalProvider = process.env.LLM_PROVIDER;
-  const originalKey = process.env.ABACUSAI_API_KEY;
+  const originalKey = process.env.OPENAI_API_KEY;
 
   beforeEach(() => {
-    process.env.ABACUSAI_API_KEY = "test-key";
+    process.env.OPENAI_API_KEY = "test-key";
   });
 
   afterEach(() => {
@@ -16,20 +16,20 @@ describe("createLLMProvider", () => {
       process.env.LLM_PROVIDER = originalProvider;
     }
     if (originalKey === undefined) {
-      delete process.env.ABACUSAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
     } else {
-      process.env.ABACUSAI_API_KEY = originalKey;
+      process.env.OPENAI_API_KEY = originalKey;
     }
   });
 
-  it("returns an AbacusAIProvider when LLM_PROVIDER is unset", () => {
+  it("returns an OpenAIProvider when LLM_PROVIDER is unset", () => {
     delete process.env.LLM_PROVIDER;
-    expect(createLLMProvider()).toBeInstanceOf(AbacusAIProvider);
+    expect(createLLMProvider()).toBeInstanceOf(OpenAIProvider);
   });
 
-  it("returns an AbacusAIProvider when LLM_PROVIDER=abacusai", () => {
-    process.env.LLM_PROVIDER = "abacusai";
-    expect(createLLMProvider()).toBeInstanceOf(AbacusAIProvider);
+  it("returns an OpenAIProvider when LLM_PROVIDER=openai", () => {
+    process.env.LLM_PROVIDER = "openai";
+    expect(createLLMProvider()).toBeInstanceOf(OpenAIProvider);
   });
 
   it("throws for an unknown LLM_PROVIDER value", () => {

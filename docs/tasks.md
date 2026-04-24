@@ -468,3 +468,26 @@ Tasks are ordered by dependency. A task should not be started until all tasks it
 - [ ] Web edit updates the meal; `EditHistory` record exists.
 - [ ] `Log.latency_ms` is under 5,000ms for at least 3 sample messages.
 - [ ] `pnpm test` passes with ≥ 80% coverage on `packages/*` and `apps/api/src/services/`.
+
+---
+
+## T-21 — `packages/llm` — Replace AbacusAI Provider with OpenAI
+
+**PRD refs:** FR-5, FR-6, FR-6a, FR-7
+**Depends on:** T-04, T-07
+
+**Scope**
+- Replace the current default LLM provider implementation in `packages/llm` from `AbacusAIProvider` to `OpenAIProvider`.
+- Update the provider factory so `LLM_PROVIDER=openai` is supported and becomes the default selection when `LLM_PROVIDER` is unset.
+- Replace AbacusAI-specific environment variables and config with OpenAI equivalents in `packages/llm`, `.env.example`, and any app wiring that reads LLM configuration.
+- Preserve the existing `LLMProvider` interface, prompt builders, schema validation, and `LLMParseError` behaviour so the core pipeline does not need to change.
+- Update unit tests and manual smoke-test instructions to cover the OpenAI-backed implementation.
+- Update design docs that still describe AbacusAI as the active/default provider so the documentation matches the new architecture.
+
+**Definition of Done**
+- [ ] `OpenAIProvider.parseMessage()` returns a valid `MealParseResult` when called with a real OpenAI API key (manual smoke test).
+- [ ] `OpenAIProvider.editMessage()` returns a valid `EditInstruction` when called with a real OpenAI API key (manual smoke test).
+- [ ] Unit tests with mocked HTTP client cover valid JSON, malformed JSON, schema mismatch, and clarification-required responses for the OpenAI-backed provider.
+- [ ] Provider factory returns `OpenAIProvider` when `LLM_PROVIDER=openai` and when `LLM_PROVIDER` is unset.
+- [ ] No AbacusAI-specific env vars are required anywhere in the active runtime path after the migration.
+- [ ] `pnpm --filter @diet-ai/llm build`, `pnpm --filter @diet-ai/llm test`, `pnpm build`, and `pnpm test` all pass after the replacement.

@@ -1,7 +1,7 @@
 import { prisma } from '../client'
 import type { Prisma } from '../generated/client'
 
-export function createToken(data: Prisma.MagicLinkTokenCreateInput) {
+export function createToken(data: Prisma.MagicLinkTokenUncheckedCreateInput) {
   return prisma.magicLinkToken.create({ data })
 }
 

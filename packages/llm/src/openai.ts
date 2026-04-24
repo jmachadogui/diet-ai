@@ -10,13 +10,12 @@ function stripCodeFences(s: string): string {
   return s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 }
 
-export class AbacusAIProvider implements LLMProvider {
+export class OpenAIProvider implements LLMProvider {
   private client: OpenAI;
 
   constructor(client?: OpenAI) {
     this.client = client ?? new OpenAI({
-      baseURL: "https://routellm.abacus.ai/v1",
-      apiKey: process.env.ABACUSAI_API_KEY,
+      apiKey: process.env.OPENAI_API_KEY,
     });
   }
 
