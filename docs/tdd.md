@@ -237,7 +237,7 @@ const client = new OpenAI({
 });
 ```
 
-- **Model:** default from `OPENAI_MODEL` (or per-operation overrides via `OPENAI_PARSE_MODEL` / `OPENAI_EDIT_MODEL`).
+- **Model:** default from `OPENAI_MODEL`.
 - **Structured output:** uses `response_format: { type: "json_object" }` combined with a system prompt that enforces the schema. The raw string response is parsed and validated with Zod before being returned.
 - **Auth:** Bearer API key via `OPENAI_API_KEY` env var.
 
@@ -296,14 +296,14 @@ FatSecret OAuth 2.0 token is obtained via Client Credentials flow and cached in-
 
 **Rationale:** `gpt-4.1-mini` provides reliable structured JSON output with low latency and cost, which fits frequent parsing/editing calls in the meal logging pipeline.
 
-**Override:** Configurable via env vars (`OPENAI_MODEL`, `OPENAI_PARSE_MODEL`, `OPENAI_EDIT_MODEL`).
+**Override:** Configurable via env var (`OPENAI_MODEL`).
 
 **Per-task model assignment** (`packages/llm/src/config.ts`):
 
 ```typescript
 export const LLM_MODELS = {
-  parse: process.env.OPENAI_PARSE_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
-  edit: process.env.OPENAI_EDIT_MODEL ?? process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+  parse: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
+  edit: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
 } as const;
 ```
 
@@ -953,8 +953,6 @@ JWT_SECRET=changeme
 LLM_PROVIDER=openai
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
-OPENAI_PARSE_MODEL=
-OPENAI_EDIT_MODEL=
 
 # Nutrition API
 NUTRITION_PROVIDER=fatsecret
@@ -1052,7 +1050,7 @@ volumes:
 
 | # | Decision | Options | Notes |
 |---|---|---|---|
-| 1 | OpenAI model selection | shared model vs per-operation overrides | Default: `gpt-4.1-mini`; override via `OPENAI_MODEL`, `OPENAI_PARSE_MODEL`, or `OPENAI_EDIT_MODEL` |
+| 1 | OpenAI model selection | use a single shared model | Default: `gpt-4.1-mini`; override via `OPENAI_MODEL` |
 | 2 | Clarification session state | In-memory Map, Redis, DB flag on LOGS | MVP: Redis key `clarification:<userId>` with 5-min TTL |
 | 3 | Nutrition cache eviction | Query-time TTL check only vs background cron | MVP: query-time only |
 | 4 | FatSecret food match scoring | First result vs keyword scoring | Start with first result; improve if accuracy issues arise |
