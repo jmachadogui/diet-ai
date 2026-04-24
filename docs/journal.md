@@ -68,6 +68,12 @@
 - [x] No AbacusAI-specific env vars are required anywhere in the active runtime path after the migration.
 - [x] `pnpm --filter @diet-ai/llm build`, `pnpm --filter @diet-ai/llm test`, `pnpm build`, and `pnpm test` all pass after the replacement.
 
+### Amendment — 2026-04-23 (simplify OpenAI model env keys)
+
+- Simplified LLM model configuration to use a single env key: `OPENAI_MODEL`.
+- Removed optional per-operation keys (`OPENAI_PARSE_MODEL`, `OPENAI_EDIT_MODEL`) from `.env.example`, `packages/llm/src/config.ts`, and active architecture docs (`docs/tdd.md`).
+- Kept `LLM_MODELS.parse` and `LLM_MODELS.edit` in code, both mapped to `OPENAI_MODEL`, so call sites and abstractions remain unchanged.
+
 ## 2026-03-18 — T-02: Prisma Schema & Database Setup
 
 ### Created feature branch
