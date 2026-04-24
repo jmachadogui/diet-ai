@@ -1,5 +1,79 @@
 # Project Journal
 
+## 2026-04-23 — Roadmap update: add OpenAI migration task
+
+**Steps taken:**
+- Read `AGENTS.md`, `docs/prd.md`, `docs/tdd.md`, `docs/calorie_tracker_erd.md`, and `docs/tasks.md` before changing the roadmap.
+- Reviewed the existing LLM architecture and confirmed the current design and task list still describe AbacusAI as the default LLM provider.
+- Added `T-21` to `docs/tasks.md` as a follow-up task to replace the current AbacusAI-backed implementation with an OpenAI-backed provider while preserving the existing `LLMProvider` abstraction.
+
+**Decisions made:**
+- Kept the change as a new roadmap task instead of rewriting historical task `T-04`, since `T-04` documents work that was already planned and implemented against AbacusAI.
+- Set `T-21` dependencies to `T-04` and `T-07` so the migration is explicitly framed as a provider swap on top of the existing LLM package and application wiring.
+- Scoped the task to include code, configuration, tests, and design-document updates so the migration is complete rather than only changing the provider class.
+
+**DoD verification:**
+- [x] New roadmap task created in `docs/tasks.md`.
+- [x] Task includes scope, dependencies, PRD refs, and a definition of done aligned with the current documentation format.
+
+## 2026-04-23 — T-21: `packages/llm` — Replace AbacusAI Provider with OpenAI (planning)
+
+**Steps taken:**
+- Read `docs/tasks.md §T-21`, `docs/tdd.md`, and the existing LLM implementation under `packages/llm/src/` before drafting the plan.
+- Reviewed the existing `T-04` plan and current source files (`provider.ts`, `abacusai.ts`, `config.ts`, `factory.ts`, and tests) so the new plan matches the repository's real current state.
+- Created `docs/plans/t-21-plan.md` with a step-by-step migration plan covering provider replacement, env/config updates, factory changes, test migration, documentation updates, and verification.
+
+**Decisions made:**
+- Framed `T-21` as a migration task that preserves the `LLMProvider` abstraction and swaps the backing provider behind `createLLMProvider()`.
+- Preferred adding `openai.ts` and then deleting `abacusai.ts`, rather than renaming a file in place, to keep the migration explicit and reviewable.
+- Included `.env.example` and `docs/tdd.md` directly in scope so the task finishes with code and docs aligned.
+
+**DoD verification:**
+- [x] `docs/plans/t-21-plan.md` created.
+- [x] Plan references task scope, dependencies, related design docs, concrete file changes, risks, and verification steps.
+
+## 2026-04-23 — T-21: `packages/llm` — Replace AbacusAI Provider with OpenAI (implementation)
+
+**Branch:** `feat/t-21-openai-provider`
+
+**Steps taken:**
+- Replaced the active LLM provider implementation by creating `packages/llm/src/openai.ts` with `OpenAIProvider` and deleting `packages/llm/src/abacusai.ts`.
+- Preserved existing provider behavior: system prompt builders, `response_format: { type: "json_object" }`, code-fence stripping, JSON parsing, Zod validation, and `LLMParseError` handling for empty response/malformed JSON/schema mismatch.
+- Updated `packages/llm/src/config.ts` to OpenAI model env vars with fallback order: `OPENAI_PARSE_MODEL` / `OPENAI_EDIT_MODEL` → `OPENAI_MODEL` → `gpt-4.1-mini`.
+- Updated `packages/llm/src/factory.ts` to default `LLM_PROVIDER` to `openai` and instantiate `OpenAIProvider` for unset or explicit `openai`.
+- Updated `packages/llm/src/index.ts` exports to expose `OpenAIProvider` and remove `AbacusAIProvider`.
+- Migrated tests by adding `packages/llm/src/__tests__/openai.test.ts`, updating `packages/llm/src/__tests__/factory.test.ts` for OpenAI expectations/env vars, and deleting `packages/llm/src/__tests__/abacusai.test.ts`.
+- Updated runtime env docs in `.env.example` to `OPENAI_*` variables and removed AbacusAI-specific entries from active runtime config.
+- Updated `docs/tdd.md` sections that described AbacusAI as default so architecture docs now reflect OpenAI as the active default provider while keeping the LLM-agnostic abstraction.
+
+**Decisions made:**
+- Kept the provider abstraction and API surface unchanged so `apps/api` wiring through `createLLMProvider()` remains intact.
+- Kept test strategy based on constructor-injected mock OpenAI clients for deterministic, no-network unit tests.
+- Did not alias `LLM_PROVIDER=abacusai` to `openai`; unknown providers still fail fast.
+
+**Blockers:**
+- Manual OpenAI smoke tests could not be executed because `OPENAI_API_KEY` is not set in process env or `.env` in this workspace.
+
+**Verification run:**
+- `pnpm --filter @diet-ai/llm build` ✅
+- `pnpm --filter @diet-ai/llm test` ✅ (13/13)
+- `pnpm build` ✅
+- `pnpm test` ✅ (re-run outside sandbox due local port binding restrictions in sandboxed API tests)
+
+**DoD verification:**
+- [ ] `OpenAIProvider.parseMessage()` returns a valid `MealParseResult` when called with a real OpenAI API key (manual smoke test pending `OPENAI_API_KEY`).
+- [ ] `OpenAIProvider.editMessage()` returns a valid `EditInstruction` when called with a real OpenAI API key (manual smoke test pending `OPENAI_API_KEY`).
+- [x] Unit tests with mocked HTTP client cover valid JSON, malformed JSON, schema mismatch, and clarification-required responses for the OpenAI-backed provider.
+- [x] Provider factory returns `OpenAIProvider` when `LLM_PROVIDER=openai` and when `LLM_PROVIDER` is unset.
+- [x] No AbacusAI-specific env vars are required anywhere in the active runtime path after the migration.
+- [x] `pnpm --filter @diet-ai/llm build`, `pnpm --filter @diet-ai/llm test`, `pnpm build`, and `pnpm test` all pass after the replacement.
+
+### Amendment — 2026-04-23 (simplify OpenAI model env keys)
+
+- Simplified LLM model configuration to use a single env key: `OPENAI_MODEL`.
+- Removed optional per-operation keys (`OPENAI_PARSE_MODEL`, `OPENAI_EDIT_MODEL`) from `.env.example`, `packages/llm/src/config.ts`, and active architecture docs (`docs/tdd.md`).
+- Kept `LLM_MODELS.parse` and `LLM_MODELS.edit` in code, both mapped to `OPENAI_MODEL`, so call sites and abstractions remain unchanged.
+
 ## 2026-03-18 — T-02: Prisma Schema & Database Setup
 
 ### Created feature branch
